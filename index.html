@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unit Cell Explorer</title>
+<meta name="description" content="Rotate simple cubic, body-centered cubic and face-centered cubic unit cells in 3D, build 2×2×2 and 3×3×3 blocks, and pull the cells apart.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 10l10-5 10 5v12l-10 5-10-5z' fill='none' stroke='%232670cc' stroke-width='2.5' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23eb6834'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/styles.css">
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('unit-cell-explorer-theme');
+      if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+    } catch (e) { /* storage unavailable */ }
+  })();
+</script>
+</head>
+<body>
+<header class="site-header">
+  <div class="title-row">
+    <div>
+      <p class="eyebrow">Solid State · Interactive</p>
+      <h1>Unit Cell Explorer</h1>
+      <div class="title-rule" aria-hidden="true"><span></span><span></span><span></span></div>
+      <p class="present-hint">Alt + Shift + P toggles · Esc exits</p>
+    </div>
+    <div class="header-actions">
+      <button id="theme" class="btn ghost" type="button" title="Switch between automatic, light and dark colors">Theme: auto</button>
+      <button id="present" class="btn ghost" type="button" aria-pressed="false" title="Larger text and controls for projecting. Escape exits.">Present</button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="card visual-card" aria-labelledby="view-title">
+    <h2 id="view-title" class="visually-hidden">3D View</h2>
+    <div class="stage" id="stage">
+
+      <div class="bar bar-top">
+        <div class="seg" role="group" aria-label="Lattice">
+          <button type="button" class="chip" data-lattice="sc" aria-pressed="true">SC<span class="visually-hidden">, simple cubic</span></button>
+          <button type="button" class="chip" data-lattice="bcc" aria-pressed="false">BCC<span class="visually-hidden">, body-centered cubic</span></button>
+          <button type="button" class="chip" data-lattice="fcc" aria-pressed="false">FCC<span class="visually-hidden">, face-centered cubic</span></button>
+          <!-- HCP is switched off for now; everything marked data-hcp is its UI. See README "Bringing HCP back". -->
+          <button type="button" class="chip" data-lattice="hcp" aria-pressed="false" data-hcp hidden>HCP<span class="visually-hidden">, hexagonal close-packed</span></button>
+        </div>
+        <div class="seg" role="group" aria-label="Unit cells">
+          <button type="button" class="chip" data-n="1" aria-pressed="true">1</button>
+          <button type="button" class="chip" data-n="2" aria-pressed="false">2×2×2</button>
+          <button type="button" class="chip" data-n="3" aria-pressed="false">3×3×3</button>
+        </div>
+      </div>
+
+      <ul class="key" id="key" role="list" aria-label="Key" hidden>
+        <li data-key="corner"><span class="sw" style="--sw: var(--atom-corner)" aria-hidden="true"></span><span>Corner</span></li>
+        <li data-key="body"><span class="sw" style="--sw: var(--atom-body)" aria-hidden="true"></span><span>Body center</span></li>
+        <li data-key="face"><span class="sw" style="--sw: var(--atom-face)" aria-hidden="true"></span><span>Face center</span></li>
+        <li data-key="interior"><span class="sw" style="--sw: var(--atom-interior)" aria-hidden="true"></span><span>Interior</span></li>
+        <li data-key="layer-a"><span class="sw" style="--sw: var(--layer-a)" aria-hidden="true"></span><span>A layer</span></li>
+        <li data-key="layer-b"><span class="sw" style="--sw: var(--layer-b)" aria-hidden="true"></span><span>B layer</span></li>
+        <li data-key="layer-c"><span class="sw" style="--sw: var(--layer-c)" aria-hidden="true"></span><span>C layer</span></li>
+      </ul>
+
+      <div class="bar bar-bottom">
+        <div class="seg" role="group" aria-label="Display">
+          <button type="button" class="tool" id="clip" aria-pressed="true" aria-label="Clip outer spheres" title="Clip outer spheres to the cell faces (atoms shared between cells are always cut)">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect x="3" y="3" width="14" height="14" rx="1"/><path d="M3 9a6 6 0 0 0 6-6M17 11a6 6 0 0 0-6 6M11 3a6 6 0 0 0 6 6M9 17a6 6 0 0 0-6-6"/></svg>
+          </button>
+          <button type="button" class="tool" id="edges" aria-pressed="false" aria-label="Cell edges" title="Outline the edges of each cell">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 7l5-4h9v10l-5 4H3z M3 7h9v10 M12 7l5-4"/></svg>
+          </button>
+          <button type="button" class="tool" id="sites" aria-pressed="false" aria-label="Color by site" title="Color corner, body-center and face-center sites">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="5.5" cy="5.5" r="3"/><circle cx="14.5" cy="5.5" r="3"/><circle cx="10" cy="14" r="3.6" class="fill"/></svg>
+          </button>
+          <button type="button" class="tool" id="layers" aria-pressed="false" aria-label="Layers" title="Color the close-packed A, B, C layers (FCC)" hidden>
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M2 5h11M7 10h11M4.5 15h11"/></svg>
+          </button>
+          <button type="button" class="tool" id="prism" aria-pressed="false" aria-label="Hexagonal prism" title="Show the hexagonal prism cell instead of the rhombic cell" hidden>
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M6 2.5h8l4 7.5-4 7.5H6L2 10z"/></svg>
+          </button>
+          <button type="button" class="tool" id="split" aria-pressed="false" aria-label="Split by layer" title="Explode pulls the close-packed layers apart instead of the cells" hidden>
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 4h14M3 10h14M3 16h14"/><path d="M10 6.5v1.5M10 12v1.5" class="bold"/></svg>
+          </button>
+          <button type="button" class="tool" id="bonds" aria-pressed="false" aria-label="Bonds" title="Show bonds between nearest neighbors">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="5" cy="15" r="3"/><circle cx="15" cy="5" r="3"/><path d="M7.2 12.8l5.6-5.6" class="bold"/></svg>
+          </button>
+        </div>
+        <div class="bar-break" aria-hidden="true"></div>
+
+        <div class="slide">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="3"/></svg>
+          <input type="range" id="size" min="15" max="100" step="1" value="100" aria-label="Atom size" title="Atom size">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="7.5"/></svg>
+        </div>
+
+        <div class="slide multi" hidden>
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="6.5" style="fill: var(--text-muted)"/></svg>
+          <input type="range" id="sat" min="0" max="100" step="1" value="100" aria-label="Color saturation of the other cells" title="Color saturation of the cells around the original cell">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="6.5" style="fill: var(--series-c)"/></svg>
+        </div>
+
+        <div class="slide multi" hidden>
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect x="3" y="3" width="7" height="7"/><rect x="10" y="3" width="7" height="7"/><rect x="3" y="10" width="7" height="7"/><rect x="10" y="10" width="7" height="7"/></svg>
+          <input type="range" id="explode" min="0" max="100" step="1" value="0" aria-label="Explode cells" title="Pull the cells apart">
+          <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect x="1" y="1" width="6" height="6"/><rect x="13" y="1" width="6" height="6"/><rect x="1" y="13" width="6" height="6"/><rect x="13" y="13" width="6" height="6"/></svg>
+        </div>
+
+        <div class="seg seg-view" role="group" aria-label="View">
+          <button type="button" class="tool" id="zoom-in" aria-label="Zoom in" title="Zoom in">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6L17 17M6 8.5h5M8.5 6v5"/></svg>
+          </button>
+          <button type="button" class="tool" id="zoom-out" aria-label="Zoom out" title="Zoom out">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M12.6 12.6L17 17M6 8.5h5"/></svg>
+          </button>
+          <button type="button" class="tool" id="reset" aria-label="Reset view" title="Reset view">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M4.5 10a5.5 5.5 0 1 0 1.8-4.1"/><path d="M6.6 2.6v3.6h3.6" /></svg>
+          </button>
+          <details class="help" id="help">
+            <summary class="tool" title="Help"><span aria-hidden="true">?</span><span class="visually-hidden">Help</span></summary>
+            <div class="help-panel">
+              <p>Drag to rotate. Scroll or pinch to zoom.</p>
+              <p>Keyboard: focus the view, then arrow keys rotate, + and − zoom, Home resets.</p>
+              <p>Spheres are hard spheres sized so nearest neighbors touch. Atoms shared between cells are always cut at the faces between them.</p>
+              <p>Color by site: corner atoms sit on the cell corners, body-center atoms in the middle of the cell, face-center atoms in the middle of each face.</p>
+              <p data-hcp hidden>HCP interior atoms sit inside the cell.</p>
+              <p>Layers (FCC): close-packed layers stack A, B, C, A… along the body diagonal.</p>
+              <p data-hcp hidden>In HCP they stack A, B, A… up the c axis.</p>
+              <p data-hcp hidden>HCP atoms start at 57% of touching size so the interior atom is not cut.</p>
+              <p>Split by layer (FCC blocks): the explode slider pulls the close-packed layers apart instead of the cells.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="view-wrap">
+        <canvas id="view" tabindex="0" role="img" aria-label="3D view of a simple cubic unit cell." aria-describedby="view-keys"></canvas>
+        <p class="nogl" id="nogl" hidden>This view needs WebGL 2, which this browser has turned off or does not support.</p>
+      </div>
+    </div>
+    <p id="view-keys" class="visually-hidden">Arrow keys rotate the crystal, plus and minus zoom, Home resets the view.</p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  Hard-sphere models of the cubic lattices, with radii set so nearest neighbors touch.
+  <a href="https://github.com/analyticalchem/unit-cell-explorer" aria-label="Unit Cell Explorer source code on GitHub">Source</a> ·
+  Part of analyticalchem · <a href="https://analyticalchem.github.io/">All projects</a>
+</footer>
+
+<p id="present-status" class="visually-hidden" role="status"></p>
+<p id="scene-status" class="visually-hidden" role="status"></p>
+
+<script src="js/model.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
