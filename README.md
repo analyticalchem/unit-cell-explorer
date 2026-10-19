@@ -54,4 +54,6 @@ Where the code lives: `hcp` and `hcpx` in `LATTICES` and `hexPrism()` in `js/mod
 
 `index.html` · `css/styles.css` · `js/model.js` (geometry) · `js/camera.js` (orbit camera and input) · `js/renderer.js` (WebGL) · `js/main.js` (wiring)
 
+**Releasing an update:** `index.html` loads the stylesheet and scripts with a version tag (`?v=20261019-3`). Change all five tags to a new value with every release, so visitors' browsers fetch the new files instead of reusing cached old ones (GitHub Pages lets browsers cache files for up to 10 minutes).
+
 Part of [analyticalchem](https://analyticalchem.github.io/).
