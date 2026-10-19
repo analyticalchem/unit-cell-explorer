@@ -113,14 +113,19 @@
     return L;
   }
   var LATTICES = {
-    sc:   lattice('sc',   'sc',  'simple cubic',           'unit cell', boxCell(CUBE, cubeSites()), 0.5, 1),
-    bcc:  lattice('bcc',  'bcc', 'body-centered cubic',    'unit cell', boxCell(CUBE, cubeSites(BODY)), S3 / 4, S3 / 2),
+    // cnSite: the atom of the original cell whose neighbors the Coordination view shows. SC: the
+    // corner nearest the default camera; BCC: the body centre; FCC: the front face centre;
+    // HCP: an interior atom.
+    sc:   lattice('sc',   'sc',  'simple cubic',           'unit cell', boxCell(CUBE, cubeSites()), 0.5, 1,
+                  { cnSite: 'c7' }),
+    bcc:  lattice('bcc',  'bcc', 'body-centered cubic',    'unit cell', boxCell(CUBE, cubeSites(BODY)), S3 / 4, S3 / 2,
+                  { cnSite: 'b' }),
     fcc:  lattice('fcc',  'fcc', 'face-centered cubic',    'unit cell', boxCell(CUBE, cubeSites(FACES)), S2 / 4, 1 / S2,
-                  { layers: 3, stack: FCC_STACK }),
+                  { layers: 3, stack: FCC_STACK, cnSite: 'f5' }),
     hcp:  lattice('hcp',  'hcp', 'hexagonal close-packed', 'unit cell', boxCell([A1, A2, CV], cubeSites(INTERIOR)), 0.5, 1,
-                  { layers: 2, stack: HCP_STACK, size: 57 }),
+                  { layers: 2, stack: HCP_STACK, size: 57, cnSite: 'i' }),
     hcpx: lattice('hcpx', 'hcp', 'hexagonal close-packed', 'hexagonal prism', hexPrism(), 0.5, 1,
-                  { layers: 2, stack: HCP_STACK, size: 57 })
+                  { layers: 2, stack: HCP_STACK, size: 57, cnSite: 'i0' })
   };
 
   // Site pairs inside one cell at the nearest-neighbor distance.
@@ -189,5 +194,25 @@
     return { type: type, n: n, lattice: L, cells: cells, atoms: atoms, bonds: bonds };
   }
 
-  window.Model = { LATTICES: LATTICES, BIG: BIG, build: build, cellBonds: cellBonds, originalCell: originalCell, toWorld: toWorld };
+  // Coordination: the lattice's cnSite in cell cellIdx and every lattice point at the
+  // nearest-neighbor distance from it, found among the sites of the surrounding cells.
+  // Positions are world offsets from the block's base, like cell.base + site.w.
+  function neighbors(type, cellIdx) {
+    var L = LATTICES[type], site = L.sites.filter(function (s) { return s.id === L.cnSite; })[0];
+    function at(idx, s) { var b = toWorld(L.M, idx); return [b[0] + s.w[0], b[1] + s.w[1], b[2] + s.w[2]]; }
+    function layer(w) { return L.stack ? ((L.stack.planeOf(w) % L.layers) + L.layers) % L.layers : -1; }
+    var c = at(cellIdx, site), seen = {}, list = [];
+    for (var i = -1; i <= 1; i++) for (var j = -1; j <= 1; j++) for (var k = -1; k <= 1; k++) {
+      L.sites.forEach(function (s) {
+        var w = at([cellIdx[0] + i, cellIdx[1] + j, cellIdx[2] + k], s), key = pointKey(w);
+        if (seen[key] || Math.abs(len(sub(w, c)) - L.nn) > 1e-6) return;
+        seen[key] = true;
+        list.push({ w: w, key: key, site: s, layer: layer(w) });
+      });
+    }
+    return { center: { w: c, key: pointKey(c), site: site, layer: layer(c) }, list: list };
+  }
+
+  window.Model = { LATTICES: LATTICES, BIG: BIG, build: build, cellBonds: cellBonds, originalCell: originalCell,
+                   toWorld: toWorld, neighbors: neighbors, pointKey: pointKey };
 })();

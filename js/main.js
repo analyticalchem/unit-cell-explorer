@@ -7,11 +7,11 @@
   var canvas = $('view'), wrap = canvas.parentNode;
   var MAX_GAP = 0.8;           // explode gap at 100 %, in cell edges
   var LAYER_GAP = 1.5;         // layer split at 100 %, in layer spacings
-  var state = { lattice: 'sc', n: 1, prism: false, split: false, clip: true, edges: false, sites: false, layers: false, bonds: false, size: 100, sat: 100, explode: 0 };
+  var state = { lattice: 'sc', n: 1, prism: false, split: false, clip: true, edges: false, cn: false, sites: false, layers: false, bonds: false, size: 100, sat: 100, explode: 0 };
   function buildType() { return state.lattice === 'hcp' && state.prism ? 'hcpx' : state.lattice; }
   var build = Model.build(buildType(), state.n);
   var cam = new Camera();
-  var anim = { cells: {}, atoms: {}, bonds: {}, fitReady: false };
+  var anim = { cells: {}, atoms: {}, bonds: {}, cn: {}, fitReady: false };
   var colors = {}, lineW = 2, dpr = 1;
   var reduceMotion = mq('(prefers-reduced-motion: reduce)');
 
@@ -31,7 +31,7 @@
 
   /* ---------- Theme-dependent drawing values ---------- */
   function refreshTheme() {
-    ['surface', 'atom', 'atom-corner', 'atom-body', 'atom-face', 'atom-interior', 'layer-a', 'layer-b', 'layer-c', 'bond', 'cell-edge'].forEach(function (k) {
+    ['surface', 'atom', 'atom-corner', 'atom-body', 'atom-face', 'atom-interior', 'layer-a', 'layer-b', 'layer-c', 'bond', 'text-primary', 'cell-edge'].forEach(function (k) {
       colors[k] = rgb(cssVar('--' + k));
     });
     lineW = parseFloat(cssVar('--chart-line')) || 2;
@@ -60,6 +60,14 @@
     var p = params(), L = build.lattice, g = p.gap, open = g > 1e-4;
     Object.keys(anim.atoms).forEach(function (k) { anim.atoms[k].rt = 0; });
     Object.keys(anim.bonds).forEach(function (k) { anim.bonds[k].rt = 0; });
+    Object.keys(anim.cn).forEach(function (k) { anim.cn[k].rt = 0; });
+
+    // Coordination: one atom of the original cell and all its nearest neighbors, drawn whole and
+    // in colour (even outside the block) over a greyed crystal. The cells' own copies of those
+    // atoms step aside so the two never overlap.
+    var orig = build.cells.filter(function (c) { return c.original; })[0];
+    var cn = state.cn ? Model.neighbors(buildType(), orig.idx) : null, cnKeys = {};
+    if (cn) [cn.center].concat(cn.list).forEach(function (n) { cnKeys[n.key] = true; });
 
     // Cells spread by the explode gap along the block's translation vectors, then the block's
     // centre (mean of the cell centroids) moves to the origin.
@@ -83,7 +91,22 @@
       var e = anim.atoms[a.key];
       if (!e) e = anim.atoms[a.key] = { r: 0, m: 0, ref: a, off: off.slice() };
       e.ref = a; e.rt = p.r; e.mt = a.cell.original ? 0 : p.desat; e.offT = off;
+      if (cn) {
+        var b = a.cell.base, w = [b[0] + a.site.w[0], b[1] + a.site.w[1], b[2] + a.site.w[2]];
+        if (cnKeys[Model.pointKey(w)]) e.rt = 0; else e.mt = 1;
+      }
     });
+    if (cn) {
+      var ot = anim.cells[orig.key].t;
+      [cn.center].concat(cn.list).forEach(function (n, i) {
+        var rel = [n.w[0] - orig.base[0], n.w[1] - orig.base[1], n.w[2] - orig.base[2]];
+        var e = anim.cn[n.key];
+        if (!e) e = anim.cn[n.key] = { r: 0, m: 0 };
+        e.ref = { rel: rel, site: n.site, layer: n.layer, center: i === 0 }; e.rt = p.r; e.mt = 0;
+        R = Math.max(R, Math.hypot(ot[0] + rel[0], ot[1] + rel[1], ot[2] + rel[2]));
+      });
+      anim.cnCount = cn.list.length;
+    }
     R += (hi - lo) / 2 * step;
     var layersOpen = p.layerGap > 1e-4;
     build.bonds.forEach(function (b) {
@@ -110,7 +133,7 @@
       var c = anim.cells[key];
       for (var i = 0; i < 3; i++) c.o[i] = ease(c.o[i], c.t[i]);
     });
-    [anim.atoms, anim.bonds].forEach(function (set) {
+    [anim.atoms, anim.bonds, anim.cn].forEach(function (set) {
       Object.keys(set).forEach(function (key) {
         var e = set[key];
         e.r = ease(e.r, e.rt); e.m = ease(e.m, e.mt || 0);
@@ -209,6 +232,23 @@
       pushCyl(bufs.bond, P, Q, e.r, colors.bond, 1, b.cross ? null : cutFor(b.cellA, offA));
     });
 
+    // Coordination cluster: whole spheres around the chosen atom, joined to it by spokes.
+    var cnCenter = null, cnAtoms = [], oo = anim.cells['0,0,0'] ? anim.cells['0,0,0'].o : ZERO;
+    Object.keys(anim.cn).forEach(function (key) {
+      var e = anim.cn[key], c = add(oo, e.ref.rel);
+      pushSph(bufs.sph, c, e.r, atomColor(e.ref), 1, ZERO, NO_CLIP.lo, NO_CLIP.hi);
+      if (e.ref.center) cnCenter = { c: c, e: e }; else cnAtoms.push({ c: c, e: e });
+    });
+    if (cnCenter) cnAtoms.forEach(function (n) {
+      var A = cnCenter.c, B = n.c, d = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], len = Math.hypot(d[0], d[1], d[2]);
+      var rb = Math.min(0.05, 0.35 * Math.min(cnCenter.e.r, n.e.r));
+      function inset(r) { return r > rb ? Math.sqrt(r * r - rb * rb) / len : 0; }
+      var ta = inset(cnCenter.e.r), tb = 1 - inset(n.e.r);
+      if (tb <= ta || rb <= 0) return;
+      pushCyl(bufs.bond, [A[0] + d[0] * ta, A[1] + d[1] * ta, A[2] + d[2] * ta],
+        [A[0] + d[0] * tb, A[1] + d[1] * tb, A[2] + d[2] * tb], rb, colors['text-primary'], 1);
+    });
+
     // Cell edges are optional (off by default) and mean nothing once the layers are pulled apart through them.
     if (state.edges && p.layerGap <= 1e-4) build.cells.forEach(function (cell) {
       var o = anim.cells[cell.key].o;
@@ -259,6 +299,7 @@
     if (p.desat > 0) bits.push('cells around the original cell at ' + state.sat + ' percent color saturation');
     if (p.bonds) bits.push('bonds between nearest neighbors');
     if (state.edges) bits.push('cell edges outlined');
+    if (state.cn && anim.cnCount) bits.push('one atom shown with its ' + anim.cnCount + ' nearest neighbors, coordination number ' + anim.cnCount + ', the rest greyed');
     if (p.gap > 0) bits.push('cells pulled apart');
     if (p.layerGap > 0) bits.push('close-packed layers pulled apart along the ' + (L.family === 'fcc' ? 'body diagonal' : 'c axis'));
     else if (p.split) bits.push('explode set to split by layer');
@@ -272,7 +313,7 @@
     var multi = state.n > 1, L = build.lattice;
     document.querySelectorAll('[data-lattice]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.lattice === state.lattice)); });
     document.querySelectorAll('[data-n]').forEach(function (b) { b.setAttribute('aria-pressed', String(+b.dataset.n === state.n)); });
-    ['clip', 'edges', 'sites', 'layers', 'bonds'].forEach(function (id) { $(id).setAttribute('aria-pressed', String(state[id])); });
+    ['clip', 'edges', 'sites', 'layers', 'bonds', 'cn'].forEach(function (id) { $(id).setAttribute('aria-pressed', String(state[id])); });
     document.querySelectorAll('.multi').forEach(function (el) { el.hidden = !multi; });
     $('layers').hidden = !L.layers;
     $('prism').hidden = L.family !== 'hcp';
@@ -294,8 +335,10 @@
       body: sites && L.family === 'bcc',
       face: sites && (L.family === 'fcc' || L.id === 'hcpx'),
       interior: sites && L.family === 'hcp',
-      'layer-a': layers, 'layer-b': layers, 'layer-c': layers && L.layers === 3
+      'layer-a': layers, 'layer-b': layers, 'layer-c': layers && L.layers === 3,
+      cn: state.cn
     }, any = false;
+    $('cn-text').textContent = 'Coordination number ' + (anim.cnCount || '');
     document.querySelectorAll('#key li').forEach(function (li) { li.hidden = !show[li.dataset.key]; any = any || show[li.dataset.key]; });
     $('key').hidden = !any;
 
@@ -305,8 +348,8 @@
   function change(fn, structural) {
     fn();
     if (structural) build = Model.build(buildType(), state.n);
-    updateUI();
     setTargets();
+    updateUI();
     requestDraw();
     if (structural) {
       var L = build.lattice;
@@ -356,6 +399,14 @@
         state.size = Math.round(lo + 0.75 * (hi - lo));
       }
     });
+  });
+  $('cn').addEventListener('click', function () {
+    change(function () {
+      state.cn = !state.cn;
+      // The spokes, and the centre atom inside its shell of neighbors, need room: at most half size.
+      if (state.cn && state.size > 50) state.size = 50;
+    });
+    if (state.cn) announce('Coordination number ' + anim.cnCount + '.');
   });
   $('size').addEventListener('input', function () { change(function () { state.size = +$('size').value; }); });
   $('sat').addEventListener('input', function () { change(function () { state.sat = +$('sat').value; }); });

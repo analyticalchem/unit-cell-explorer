@@ -8,6 +8,7 @@ An interactive 3D view of the simple cubic (SC), body-centered cubic (BCC) and f
 - **Cell edges**: outline each cell (off by default).
 - **Color by site**: corner, body-centre and face-centre atoms in different colours.
 - **Layers** (FCC): close-packed layers colored A, B, C, stacked along the body diagonal. Switching between layer and site colors changes only the colors, never the view.
+- **Coordination** (all views): one atom is shown whole with all its nearest neighbors (even those outside the cell), joined by spokes, over a greyed crystal; the key gives the coordination number (SC 6, BCC 8, FCC 12). Turning it on caps atom size at 50 % so the spokes show.
 - **Atom size and bonds** (all views): nearest-neighbor bonds; turning bonds on sets atom size three quarters of the way to large; bonds end at the sphere surfaces and are cut at the cell faces like the atoms.
 - **Blocks only**: color saturation of the cells around the original one (full color by default; lower it to grey them out) and an explode slider that pulls the cells apart. For FCC, **Split by layer** makes the explode slider pull the close-packed layers apart along the stacking direction instead (cells stay put; bonds between layers and the cell edges are hidden while the layers are apart).
 - Settings carry over when you switch lattices or cell counts.
@@ -21,7 +22,7 @@ Lattice constant a = 1. Sphere radii are the hard-sphere values at which nearest
 
 Plain WebGL 2, no libraries. Spheres are ray-cast in the fragment shader on camera-facing squares, then clipped against their cell, described as up to four slabs (three for a parallelepiped, four for the hexagonal prism); a cut sphere shows its flat cut face exactly and depth is written per pixel. Bonds are ray-traced the same way (solid rods cut by the same slabs); cell edges are thin instanced tubes sized in screen pixels.
 
-Atoms and bonds have a metallic finish: little diffuse light, a studio-style reflection (mid-tone floor, sharp horizon, bright band) tinted by the atom's colour, and a sharp highlight. Each atom's edge is a thin line of its own theme colour. The page fills the screen: the 3D view takes whatever height is left, with a compact header on short screens.
+Atoms and bonds have a metallic finish: little diffuse light, a studio-style reflection (mid-tone floor, sharp horizon, bright band) tinted by the atom's colour, and a sharp highlight. Each atom's edge is a thin line of its own theme colour. The page fills the screen: the 3D view uses the full window width and whatever height is left, with a compact header on short screens and slightly larger controls on large screens (from 1600 × 900).
 
 ## Hexagonal close-packed (HCP): built, switched off
 

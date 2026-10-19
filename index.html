@@ -60,6 +60,7 @@
         <li data-key="layer-a"><span class="sw" style="--sw: var(--layer-a)" aria-hidden="true"></span><span>A layer</span></li>
         <li data-key="layer-b"><span class="sw" style="--sw: var(--layer-b)" aria-hidden="true"></span><span>B layer</span></li>
         <li data-key="layer-c"><span class="sw" style="--sw: var(--layer-c)" aria-hidden="true"></span><span>C layer</span></li>
+        <li data-key="cn"><span class="sw spoke" aria-hidden="true"></span><span id="cn-text">Coordination number</span></li>
       </ul>
 
       <div class="bar bar-bottom">
@@ -81,6 +82,9 @@
           </button>
           <button type="button" class="tool" id="split" aria-pressed="false" aria-label="Split by layer" title="Explode pulls the close-packed layers apart instead of the cells" hidden>
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 4h14M3 10h14M3 16h14"/><path d="M10 6.5v1.5M10 12v1.5" class="bold"/></svg>
+          </button>
+          <button type="button" class="tool" id="cn" aria-pressed="false" aria-label="Coordination number" title="Show one atom with all its nearest neighbors and its coordination number">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 10L10 3M10 10L16 6.5M10 10L16 13.5M10 10L10 17M10 10L4 13.5M10 10L4 6.5"/><circle cx="10" cy="10" r="2.6" class="fill"/></svg>
           </button>
           <button type="button" class="tool" id="bonds" aria-pressed="false" aria-label="Bonds" title="Show bonds between nearest neighbors">
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="5" cy="15" r="3"/><circle cx="15" cy="5" r="3"/><path d="M7.2 12.8l5.6-5.6" class="bold"/></svg>
@@ -127,6 +131,7 @@
               <p>Layers (FCC): close-packed layers stack A, B, C, A… along the body diagonal.</p>
               <p data-hcp hidden>In HCP they stack A, B, A… up the c axis.</p>
               <p data-hcp hidden>HCP atoms start at 57% of touching size so the interior atom is not cut.</p>
+              <p>Coordination: one atom (center) is shown whole with all of its nearest neighbors, joined by spokes, even neighbors outside the cell; the rest of the crystal turns grey. The number of spokes is the coordination number.</p>
               <p>Split by layer (FCC blocks): the explode slider pulls the close-packed layers apart instead of the cells.</p>
             </div>
           </details>
